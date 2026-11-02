@@ -449,7 +449,7 @@ export class ProviderPanel {
       disabled: this.busy || this.loading,
     });
     reload.dataset.focus = 'refresh';
-    reload.append(icon('refresh', 15));
+    reload.append(icon('refresh', 17));
     reload.addEventListener('click', () => this.askReload());
     actions.append(reload);
 
