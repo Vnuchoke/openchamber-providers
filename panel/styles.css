@@ -111,6 +111,12 @@ html[data-oc-surface='page'] .panes {
   flex: 1;
 }
 
+.sidebar-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
 .icon-button {
   display: inline-flex;
   align-items: center;
@@ -134,6 +140,13 @@ html[data-oc-surface='page'] .panes {
 .icon-button:focus-visible {
   outline: 2px solid var(--oc-focus, var(--oc-primary));
   outline-offset: 1px;
+}
+
+.icon-button:disabled {
+  background: transparent;
+  color: var(--oc-muted);
+  opacity: 0.45;
+  cursor: default;
 }
 
 .icon-button[data-emphasis='true'] {

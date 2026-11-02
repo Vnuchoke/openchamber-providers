@@ -60,8 +60,8 @@ and paste the absolute path of the cloned folder into the same field.
 5. Choose **Save**. The block is written and the provider appears under
    **Settings → Providers**.
 
-Editing and deleting work the same way. **Reload** re-reads both config files when
-something changed outside the panel.
+Editing and deleting work the same way. **Reload** in the provider list header (or the
+editor footer) re-reads both config files when something changed outside the panel.
 
 The API key is written to `settings.apiKey` as plain text. To keep the secret out of the
 file, enter `{env:VAR_NAME}` (or `{file:path/to/secret}`) instead.

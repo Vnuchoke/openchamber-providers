@@ -440,12 +440,26 @@ export class ProviderPanel {
     count.setAttribute('aria-hidden', 'true');
     head.append(title, count, el('div', 'spacer'));
 
+    const actions = el('div', 'sidebar-actions');
+
+    const reload = el('button', 'icon-button', {
+      type: 'button',
+      'aria-label': this.tr('refresh'),
+      title: this.tr('refresh'),
+      disabled: this.busy || this.loading,
+    });
+    reload.dataset.focus = 'refresh';
+    reload.append(icon('refresh', 15));
+    reload.addEventListener('click', () => this.askReload());
+    actions.append(reload);
+
     const add = el('button', 'icon-button', { type: 'button', 'aria-label': this.tr('add'), title: this.tr('add') });
     add.dataset.focus = 'add-provider';
     add.dataset.emphasis = 'true';
     add.append(icon('plus', 15));
     add.addEventListener('click', () => this.startNew());
-    head.append(add);
+    actions.append(add);
+    head.append(actions);
     sidebar.append(head);
 
     const searchWrap = el('div', 'sidebar-search');
