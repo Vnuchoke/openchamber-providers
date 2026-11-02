@@ -1,6 +1,6 @@
 {
   "name": "openchamber-providers",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "private": true,
   "description": "OpenChamber Providers — manage custom OpenAI-compatible providers for OpenCode from an OpenChamber panel.",
   "openchamber": {

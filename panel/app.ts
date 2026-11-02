@@ -1116,6 +1116,7 @@ export class ProviderPanel {
             return;
           }
           model.id = id;
+          if (this.errors.models) this.errors.models = undefined;
           this.paint();
         },
       }));
@@ -1133,7 +1134,10 @@ export class ProviderPanel {
         mono: true,
         placeholder: 'gpt-4o',
         error: idError,
-        onChange: (value) => { model.id = value; },
+        onChange: (value) => {
+          model.id = value;
+          if (this.errors.models) this.errors.models = undefined;
+        },
       }));
       const input = idSlot.querySelector<HTMLInputElement>('input');
       if (input) input.dataset.focus = `model-id:${model.key}`;
