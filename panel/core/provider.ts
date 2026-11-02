@@ -28,8 +28,8 @@ import {
 /** Reasoning levels offered as cards, in display order. */
 export const REASONING_LEVELS = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
 
-/** Levels written for a new model. */
-export const DEFAULT_REASONING_LEVELS: string[] = ['low', 'medium', 'high'];
+/** Levels written for a new model: none, until the user picks them. */
+export const DEFAULT_REASONING_LEVELS: string[] = [];
 
 export type ModelDraft = {
   /** Stable key for this row, independent of the model ID. */
@@ -53,7 +53,7 @@ export type ProviderDraft = {
   /** Display name; on a new provider it also suggests the ID. */
   name: string;
   protocol: ProtocolId;
-  /** Only used when `protocol` is `custom`. */
+  /** Only used when `protocol` is `custom`; read from an existing provider. */
   customPackage: string;
   baseURL: string;
   apiKey: string;

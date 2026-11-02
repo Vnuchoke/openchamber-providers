@@ -11,6 +11,7 @@ import {
   mountSpinner,
   mountSwitch,
   mountTextField,
+  type SelectOption,
 } from '@openchamber/sdk/ui';
 import {
   hasProvider,
@@ -33,7 +34,7 @@ import {
   type ProviderDraft,
   type ProviderEntry,
 } from './core/provider';
-import { PROTOCOLS, packageFrom, packageLabel, packageOfProtocol, type ProtocolId } from './core/protocols';
+import { PROTOCOLS, packageLabel, type ProtocolId } from './core/protocols';
 import { hasErrors, validateDraft, type DraftErrors } from './core/validate';
 import { DICTIONARIES, type Locale, type MessageKey } from './i18n';
 import { clear, el, span } from './ui/dom';
@@ -45,7 +46,22 @@ export type ToastSink = {
   toast: (request: { kind: 'success' | 'error' | 'info'; message: string }) => Promise<unknown>;
 };
 
-export type PanelHost = FileHost & ToastSink;
+export type ModelFetchRequest = {
+  baseURL: string;
+  apiKey: string;
+  protocol: ProtocolId;
+};
+
+/** A failed model-list request, split so the panel can localise the service case. */
+export class ModelFetchError extends Error {
+  constructor(readonly code: 'service' | 'request', message: string) {
+    super(message);
+  }
+}
+
+export type PanelHost = FileHost & ToastSink & {
+  fetchModels: (request: ModelFetchRequest) => Promise<string[]>;
+};
 
 export type PendingConfirm =
   | { kind: 'select'; id: string }
@@ -61,6 +77,9 @@ const errorText = (error: unknown): string => {
   if (error instanceof Error) return error.message;
   return String(error);
 };
+
+/** Sentinel option that switches a fetched model list back to free text. */
+const CUSTOM_MODEL_OPTION = '__openchamber_custom_model__';
 
 /** Second line for a provider row: ID and host, minus the scheme. */
 const rowSubtitle = (entry: ProviderEntry, overlayLabel: string): string => {
@@ -95,6 +114,10 @@ export class ProviderPanel {
   private keyVisible = false;
   private expanded = new Set<string>();
   private detailScroll = 0;
+
+  private modelOptions: string[] = [];
+  private fetchingModelKey: string | null = null;
+  private manualModelIDs = new Set<string>();
 
   private mounted: Disposable[] = [];
 
@@ -150,6 +173,9 @@ export class ProviderPanel {
       this.errors = {};
       this.confirmingDelete = false;
       this.pending = null;
+      this.modelOptions = [];
+      this.fetchingModelKey = null;
+      this.manualModelIDs.clear();
       if (!this.selectedID || !snapshot.providers.some((entry) => entry.id === this.selectedID)) {
         this.selectedID = this.defaultSelection();
       }
@@ -179,12 +205,12 @@ export class ProviderPanel {
           const next = this.entryOf(this.selectedID);
           if (next && !next.overlay) this.openDraft(next);
         }
-      } else if (!this.draft) {
+      } else {
+        // A reload from the list must stay on the list: only an edit that was
+        // already open is kept, never opened on the user's behalf.
         this.selectedID = this.snapshot.providers.some((entry) => entry.id === this.selectedID)
           ? this.selectedID
           : this.defaultSelection();
-        const entry = this.entryOf(this.selectedID);
-        if (entry && !entry.overlay) this.openDraft(entry);
       }
     } catch (error) {
       this.fatal = errorText(error);
@@ -206,6 +232,9 @@ export class ProviderPanel {
     this.pending = null;
     this.keyVisible = false;
     this.detailScroll = 0;
+    this.modelOptions = [];
+    this.fetchingModelKey = null;
+    this.manualModelIDs.clear();
     this.expanded = new Set(this.draft.models.slice(0, 1).map((model) => model.key));
   }
 
@@ -219,6 +248,9 @@ export class ProviderPanel {
     this.pending = null;
     this.keyVisible = false;
     this.detailScroll = 0;
+    this.modelOptions = [];
+    this.fetchingModelKey = null;
+    this.manualModelIDs.clear();
     this.expanded = new Set(this.draft.models.map((model) => model.key));
   }
 
@@ -229,6 +261,9 @@ export class ProviderPanel {
     this.errors = {};
     this.confirmingDelete = false;
     this.pending = null;
+    this.modelOptions = [];
+    this.fetchingModelKey = null;
+    this.manualModelIDs.clear();
   }
 
   private select(id: string): void {
@@ -312,6 +347,62 @@ export class ProviderPanel {
   }
 
   /* ---------------------------------------------------------------- actions */
+
+  /** Fetch is available once the connection fields can form a request. */
+  private canFetchModels(): boolean {
+    if (!this.draft) return false;
+    const baseURL = this.draft.baseURL.trim();
+    const apiKey = this.draft.apiKey.trim();
+    return /^https?:\/\/\S+$/i.test(baseURL) && apiKey.length > 0;
+  }
+
+  /** Keeps the per-card Fetch buttons in step with the connection fields. */
+  private updateFetchButtons(): void {
+    const disabled = this.busy || this.fetchingModelKey !== null || !this.canFetchModels();
+    for (const button of this.root.querySelectorAll<HTMLButtonElement>('[data-fetch]')) {
+      button.disabled = disabled;
+    }
+  }
+
+  private async fetchModels(modelKey: string): Promise<void> {
+    const draft = this.draft;
+    if (!draft || this.busy || this.fetchingModelKey) return;
+    const baseURL = draft.baseURL.trim();
+    const apiKey = draft.apiKey.trim();
+    if (!baseURL || !apiKey) {
+      await this.host.toast({ kind: 'error', message: this.tr('fetchNeedsConnection') });
+      return;
+    }
+
+    this.fetchingModelKey = modelKey;
+    this.paint();
+    try {
+      const models = await this.host.fetchModels({ baseURL, apiKey, protocol: draft.protocol });
+      if (this.draft !== draft) return;
+      if (models.length === 0) {
+        await this.host.toast({ kind: 'error', message: this.tr('fetchEmpty') });
+        return;
+      }
+      this.modelOptions = models;
+      this.manualModelIDs.clear();
+      await this.host.toast({
+        kind: 'success',
+        message: fill(this.tr('fetchDone'), { count: String(models.length) }),
+      });
+    } catch (error) {
+      if (this.draft !== draft) return;
+      const message = error instanceof ModelFetchError && error.code === 'service'
+        ? this.tr('fetchService')
+        : errorText(error);
+      await this.host.toast({
+        kind: 'error',
+        message: fill(this.tr('fetchFailed'), { message }),
+      });
+    } finally {
+      this.fetchingModelKey = null;
+      this.paint();
+    }
+  }
 
   private validate(): boolean {
     if (!this.draft) return false;
@@ -440,12 +531,26 @@ export class ProviderPanel {
     count.setAttribute('aria-hidden', 'true');
     head.append(title, count, el('div', 'spacer'));
 
+    const actions = el('div', 'sidebar-actions');
+
+    const reload = el('button', 'icon-button', {
+      type: 'button',
+      'aria-label': this.tr('refresh'),
+      title: this.tr('refresh'),
+      disabled: this.busy || this.loading,
+    });
+    reload.dataset.focus = 'refresh';
+    reload.append(icon('refresh', 17));
+    reload.addEventListener('click', () => this.askReload());
+    actions.append(reload);
+
     const add = el('button', 'icon-button', { type: 'button', 'aria-label': this.tr('add'), title: this.tr('add') });
     add.dataset.focus = 'add-provider';
     add.dataset.emphasis = 'true';
     add.append(icon('plus', 15));
     add.addEventListener('click', () => this.startNew());
-    head.append(add);
+    actions.append(add);
+    head.append(actions);
     sidebar.append(head);
 
     const searchWrap = el('div', 'sidebar-search');
@@ -747,8 +852,7 @@ export class ProviderPanel {
     const firstError = this.errors.providerID
       ?? this.errors.name
       ?? this.errors.baseURL
-      ?? this.errors.apiKey
-      ?? this.errors.customPackage;
+      ?? this.errors.apiKey;
     if (firstError) {
       body.append(this.notice('error', this.tr(firstError), ''));
     }
@@ -795,46 +899,21 @@ export class ProviderPanel {
     const protocolField = mountSelect(grid, {
       label: this.tr('protocol'),
       value: current.protocol,
-      options: [
-        ...PROTOCOLS.map((item) => ({ id: item.id, label: this.protocolLabel(item.id), hint: packageLabel(item.package) })),
-        { id: 'custom', label: this.tr('protocolCustom') },
-      ],
+      options: PROTOCOLS.map((item) => ({
+        id: item.id,
+        label: this.protocolLabel(item.id),
+        hint: packageLabel(item.package),
+      })),
+      // An existing provider may carry a package outside the three known
+      // protocols. Keep it on disk and show it as the current value; the
+      // dropdown only offers the protocols the form can write.
+      placeholder: this.tr('protocolCustom'),
       onChange: (id) => {
-        // Carry the package the provider already uses when switching to a
-        // custom one, so the field starts from what is on disk.
-        if (id === 'custom' && !current.customPackage.trim()) {
-          const existing = this.entryOf(this.editingID);
-          current.customPackage = existing
-            ? packageFrom(existing.block)
-            : packageOfProtocol(current.protocol);
-        }
-        if (id !== 'custom' && current.protocol === 'custom' && this.editingID === null) {
-          current.customPackage = '';
-        }
         current.protocol = id as ProtocolId;
-        // A protocol change can reveal or hide the package field.
         this.paint();
       },
     });
     this.mounted.push(protocolField);
-
-    if (current.protocol === 'custom') {
-      const packageField = mountTextField(grid, {
-        label: this.tr('customPackage'),
-        value: current.customPackage,
-        mono: true,
-        placeholder: 'aisdk:@ai-sdk/openai-compatible',
-        error: this.errors.customPackage ? this.tr(this.errors.customPackage) : undefined,
-        onChange: (value) => {
-          current.customPackage = value;
-          if (this.errors.customPackage) {
-            this.errors.customPackage = undefined;
-            packageField.update({ value: current.customPackage, error: undefined });
-          }
-        },
-      });
-      this.mounted.push(packageField);
-    }
 
     const urlField = mountTextField(grid, {
       label: this.tr('baseURL'),
@@ -848,6 +927,7 @@ export class ProviderPanel {
           this.errors.baseURL = undefined;
           urlField.update({ value: current.baseURL, error: undefined });
         }
+        this.updateFetchButtons();
       },
     });
     this.mounted.push(urlField);
@@ -867,6 +947,7 @@ export class ProviderPanel {
           this.errors.apiKey = undefined;
           keyField.update({ value: current.apiKey, error: undefined });
         }
+        this.updateFetchButtons();
       },
     });
     this.mounted.push(keyField);
@@ -924,7 +1005,8 @@ export class ProviderPanel {
     return undefined;
   }
 
-  private renderModelCard(model: ModelDraft, index: number, current: ProviderDraft): HTMLElement {    const card = el('div', 'model-card');
+  private renderModelCard(model: ModelDraft, index: number, current: ProviderDraft): HTMLElement {
+    const card = el('div', 'model-card');
     card.dataset.model = model.key;
 
     const head = el('div', 'model-head');
@@ -946,6 +1028,18 @@ export class ProviderPanel {
 
     const id = span(head, model.id.trim() || `#${index + 1}`, 'model-id');
     id.title = model.id.trim();
+
+    const fetch = el('button', 'model-fetch', {
+      type: 'button',
+      'aria-label': this.tr('fetchModels'),
+      title: this.tr('fetchModels'),
+      disabled: this.busy || this.fetchingModelKey !== null || !this.canFetchModels(),
+    });
+    fetch.dataset.fetch = model.key;
+    fetch.dataset.focus = `model-fetch:${model.key}`;
+    fetch.textContent = this.fetchingModelKey === model.key ? this.tr('fetching') : this.tr('fetch');
+    fetch.addEventListener('click', () => void this.fetchModels(model.key));
+    head.append(fetch);
 
     if (current.models.length > 1) {
       const remove = el('button', 'model-toggle', {
@@ -969,14 +1063,59 @@ export class ProviderPanel {
     const fields = el('div', 'model-body');
     card.append(fields);
 
-    this.mounted.push(mountTextField(fields, {
-      label: this.tr('modelID'),
-      value: model.id,
-      mono: true,
-      placeholder: 'gpt-4o',
-      error: this.modelIDError(model, current),
-      onChange: (value) => { model.id = value; },
-    }));
+    const idSlot = el('div', 'model-id-slot');
+    fields.append(idSlot);
+    const idError = this.modelIDError(model, current);
+    const useSelect = this.modelOptions.length > 0 && !this.manualModelIDs.has(model.key);
+
+    if (useSelect) {
+      const currentID = model.id.trim();
+      const options: SelectOption[] = this.modelOptions.map((id) => ({ id, label: id }));
+      if (currentID && !this.modelOptions.includes(currentID)) {
+        options.unshift({ id: currentID, label: currentID, hint: this.tr('currentModel') });
+      }
+      options.push({ id: CUSTOM_MODEL_OPTION, label: this.tr('customModel') });
+      this.mounted.push(mountSelect(idSlot, {
+        label: this.tr('modelID'),
+        value: currentID || null,
+        options,
+        searchable: true,
+        searchPlaceholder: this.tr('searchModels'),
+        placeholder: this.tr('selectModel'),
+        onChange: (id) => {
+          if (id === CUSTOM_MODEL_OPTION) {
+            this.manualModelIDs.add(model.key);
+            this.paint();
+            this.root.querySelector<HTMLElement>(`[data-model="${CSS.escape(model.key)}"] input`)?.focus();
+            return;
+          }
+          model.id = id;
+          if (this.errors.models) this.errors.models = undefined;
+          this.paint();
+        },
+      }));
+      const trigger = idSlot.querySelector<HTMLElement>('.oc-sdk-trigger');
+      if (trigger) trigger.dataset.focus = `model-id:${model.key}`;
+      if (idError) {
+        const note = el('span', 'oc-sdk-field-note model-id-error');
+        note.textContent = idError;
+        idSlot.append(note);
+      }
+    } else {
+      this.mounted.push(mountTextField(idSlot, {
+        label: this.tr('modelID'),
+        value: model.id,
+        mono: true,
+        placeholder: 'gpt-4o',
+        error: idError,
+        onChange: (value) => {
+          model.id = value;
+          if (this.errors.models) this.errors.models = undefined;
+        },
+      }));
+      const input = idSlot.querySelector<HTMLInputElement>('input');
+      if (input) input.dataset.focus = `model-id:${model.key}`;
+    }
 
     this.mounted.push(mountTextField(fields, {
       label: this.tr('context'),
@@ -1059,13 +1198,6 @@ export class ProviderPanel {
     state.textContent = this.isDirty() ? this.tr('unsaved') : this.tr('savedState');
     foot.append(state, el('div', 'spacer'));
 
-    this.mounted.push(mountButton(foot, {
-      label: this.tr('refresh'),
-      variant: 'ghost',
-      size: 'sm',
-      disabled: this.busy,
-      onClick: () => this.askReload(),
-    }));
     this.mounted.push(mountButton(foot, {
       label: this.busy ? this.tr('saving') : this.tr('save'),
       size: 'sm',

@@ -5,7 +5,7 @@
  */
 import { connectHost, HostRequestError } from '@openchamber/sdk';
 import { applyHostReady } from '@openchamber/sdk/ui';
-import { ProviderPanel } from './app';
+import { ModelFetchError, ProviderPanel } from './app';
 import { localeOf } from './i18n';
 
 const host = connectHost();
@@ -23,6 +23,36 @@ const panel = new ProviderPanel(root, {
   readFile: (path) => host.readFile(path),
   writeFile: (path, content) => host.writeFile(path, content),
   toast: async (request) => host.toast({ kind: request.kind, message: request.message }),
+  fetchModels: async ({ baseURL, apiKey, protocol }) => {
+    let result: { status: number; body: string };
+    try {
+      result = await host.serviceRequest({
+        method: 'POST',
+        path: '/models',
+        body: JSON.stringify({ baseURL, apiKey, protocol }),
+      });
+    } catch (error) {
+      if (error instanceof HostRequestError && error.code === 'NO_SERVICE') {
+        throw new ModelFetchError('service', 'The local model service is not enabled.');
+      }
+      throw new ModelFetchError('request', describe(error));
+    }
+
+    let payload: unknown = null;
+    try {
+      payload = JSON.parse(result.body);
+    } catch {
+      // A non-JSON failure is reported through the status below.
+    }
+    const body = payload && typeof payload === 'object' ? payload as Record<string, unknown> : {};
+    if (result.status < 200 || result.status >= 300) {
+      const message = typeof body.error === 'string' ? body.error : `HTTP ${result.status}`;
+      throw new ModelFetchError('request', message);
+    }
+    return Array.isArray(body.models)
+      ? body.models.filter((item): item is string => typeof item === 'string')
+      : [];
+  },
 });
 
 document.addEventListener('keydown', (event) => panel.handleKeydown(event));

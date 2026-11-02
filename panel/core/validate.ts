@@ -10,12 +10,10 @@ export type DraftErrors = {
   name?: 'errorName';
   baseURL?: 'errorBaseURL';
   apiKey?: 'errorAPIKey';
-  customPackage?: 'errorPackage';
   models?: 'errorModels' | 'errorModelsDuplicate' | 'errorModelsIncomplete' | 'errorLimits';
 };
 
 const ID_PATTERN = /^[a-z0-9][a-z0-9-_]*$/;
-const PACKAGE_PATTERN = /^(aisdk:)?(@[a-z0-9-]+\/)?[a-z0-9][a-z0-9._-]*(\/[a-z0-9._-]+)*$/i;
 
 export type ValidateOptions = {
   /** Providers already on disk, keyed by ID. */
@@ -39,10 +37,6 @@ export const validateDraft = (draft: ProviderDraft, options: ValidateOptions): D
 
   const key = draft.apiKey.trim();
   if (key && !isKeyReference(key) && !isPrintableKey(key)) errors.apiKey = 'errorAPIKey';
-
-  if (draft.protocol === 'custom' && !PACKAGE_PATTERN.test(draft.customPackage.trim())) {
-    errors.customPackage = 'errorPackage';
-  }
 
   const ids = draft.models.map((model) => model.id.trim()).filter(Boolean);
   if (ids.length === 0) {

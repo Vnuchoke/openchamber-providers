@@ -83,6 +83,17 @@ const host: PanelHost = {
     setTimeout(() => node.remove(), 2600);
     return undefined;
   },
+  fetchModels: async ({ baseURL }) => {
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    if (baseURL.includes('bad')) throw new Error('HTTP 401 Unauthorized');
+    return [
+      'deepseek-v4.1-flash',
+      'deepseek-v4.1-pro',
+      'gpt-6.1-sol',
+      'claude-sonnet-4-5',
+      'qwen3-coder',
+    ];
+  },
 };
 
 const root = document.querySelector<HTMLElement>('#root');
