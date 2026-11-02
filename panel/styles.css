@@ -496,6 +496,50 @@ html[data-oc-surface='page'] .panes {
   text-overflow: ellipsis;
 }
 
+.model-fetch {
+  flex: none;
+  padding: 2px 7px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--fill);
+  color: var(--oc-fg);
+  font-size: 0.6875rem;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: background 120ms ease-out, color 120ms ease-out, border-color 120ms ease-out;
+}
+
+.model-fetch:hover:not(:disabled) {
+  background: var(--fill-strong);
+  border-color: var(--line);
+}
+
+.model-fetch:focus-visible {
+  outline: 2px solid var(--oc-focus, var(--oc-primary));
+  outline-offset: 1px;
+}
+
+.model-fetch:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.model-id-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.model-id-slot > .oc-sdk-field,
+.model-id-slot > .oc-sdk-select {
+  width: 100%;
+}
+
+.model-id-error {
+  color: var(--oc-error-text, #d9534f);
+}
+
 .model-body {
   display: flex;
   flex-direction: column;

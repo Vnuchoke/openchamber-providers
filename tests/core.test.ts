@@ -15,6 +15,7 @@ import { positiveInt } from '../panel/core/json';
 import { idFromName, uniqueIDFrom } from '../panel/core/provider';
 import { packageFrom, protocolOfPackage } from '../panel/core/protocols';
 import { validateDraft } from '../panel/core/validate';
+import { modelCandidates, modelHeaders, parseModelIDs } from '../service/models';
 
 const draft = (overrides: Partial<ProviderDraft> = {}): ProviderDraft => ({
   ...emptyDraft(),
@@ -533,5 +534,30 @@ test('env and file key references are accepted', () => {
   assert.deepEqual(validateDraft(draft({ apiKey: '{env:ACME_KEY}' }), base), {});
   assert.deepEqual(validateDraft(draft({ apiKey: '{file:~/.secrets/acme}' }), base), {});
   assert.equal(validateDraft(draft({ apiKey: 'short' }), base).apiKey, 'errorAPIKey');
+});
+
+/* --------------------------------------------------------------- model fetch */
+
+test('a new model starts with every reasoning level off', () => {
+  assert.deepEqual(emptyModel().levels, []);
+});
+
+test('model list URLs cover a bare origin and a /v1 base', () => {
+  assert.deepEqual(modelCandidates('https://relay.fast/v1'), ['https://relay.fast/v1/models']);
+  assert.deepEqual(modelCandidates('https://relay.fast/'), ['https://relay.fast/models', 'https://relay.fast/v1/models']);
+  assert.deepEqual(modelCandidates('ftp://relay.fast'), []);
+});
+
+test('model list headers follow the protocol', () => {
+  assert.equal(modelHeaders('openai-chat', 'sk-1').authorization, 'Bearer sk-1');
+  assert.equal(modelHeaders('anthropic-messages', 'sk-1')['x-api-key'], 'sk-1');
+  assert.equal(modelHeaders('anthropic-messages', 'sk-1')['anthropic-version'], '2023-06-01');
+});
+
+test('model IDs are read from the shapes gateways return', () => {
+  assert.deepEqual(parseModelIDs({ data: [{ id: 'a' }, { id: 'b' }, { id: 'a' }] }), ['a', 'b']);
+  assert.deepEqual(parseModelIDs({ models: ['c', { model: 'd' }] }), ['c', 'd']);
+  assert.deepEqual(parseModelIDs(['e', { name: 'f' }]), ['e', 'f']);
+  assert.deepEqual(parseModelIDs({ data: [] }), []);
 });
 

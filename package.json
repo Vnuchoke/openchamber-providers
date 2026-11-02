@@ -1,6 +1,6 @@
 {
   "name": "openchamber-providers",
-  "version": "2.0.5",
+  "version": "2.1.0",
   "private": true,
   "description": "OpenChamber Providers — manage custom OpenAI-compatible providers for OpenCode from an OpenChamber panel.",
   "openchamber": {
@@ -19,19 +19,24 @@
       "filesystem": [
         "~/.config/opencode/opencode.json",
         "~/.config/opencode/opencode.jsonc"
-      ]
+      ],
+      "service": {
+        "entry": "service/main.js",
+        "runtime": "host"
+      }
     }
   },
   "scripts": {
-    "build": "esbuild panel/main.ts --bundle --format=iife --platform=browser --target=es2020 --charset=utf8 --minify --outfile=panel/main.js",
-    "build:dev": "esbuild panel/main.ts --bundle --format=iife --platform=browser --target=es2020 --charset=utf8 --outfile=panel/main.js",
-    "typecheck": "tsc --noEmit",
+    "build": "esbuild panel/main.ts --bundle --format=iife --platform=browser --target=es2020 --charset=utf8 --minify --outfile=panel/main.js && esbuild service/main.ts --bundle --platform=node --format=cjs --target=node20 --charset=utf8 --minify --outfile=service/main.js",
+    "build:dev": "esbuild panel/main.ts --bundle --format=iife --platform=browser --target=es2020 --charset=utf8 --outfile=panel/main.js && esbuild service/main.ts --bundle --platform=node --format=cjs --target=node20 --charset=utf8 --outfile=service/main.js",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.service.json",
     "test": "esbuild tests/core.test.ts --bundle --platform=node --format=cjs --main-fields=module,main --outfile=.test-build.cjs && node --test .test-build.cjs",
     "preview": "esbuild scripts/preview/preview.ts --bundle --format=iife --platform=browser --target=es2020 --charset=utf8 --outfile=scripts/preview/preview.js",
     "check": "npm run typecheck && npm test && npm run build && npm run preview"
   },
   "devDependencies": {
     "@openchamber/sdk": "^2.0.0",
+    "@types/node": "^22.0.0",
     "esbuild": "^0.25.0",
     "typescript": "^5.6.0"
   },
