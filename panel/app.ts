@@ -34,7 +34,7 @@ import {
   type ProviderDraft,
   type ProviderEntry,
 } from './core/provider';
-import { PROTOCOLS, packageFrom, packageLabel, packageOfProtocol, type ProtocolId } from './core/protocols';
+import { PROTOCOLS, packageLabel, type ProtocolId } from './core/protocols';
 import { hasErrors, validateDraft, type DraftErrors } from './core/validate';
 import { DICTIONARIES, type Locale, type MessageKey } from './i18n';
 import { clear, el, span } from './ui/dom';
@@ -852,8 +852,7 @@ export class ProviderPanel {
     const firstError = this.errors.providerID
       ?? this.errors.name
       ?? this.errors.baseURL
-      ?? this.errors.apiKey
-      ?? this.errors.customPackage;
+      ?? this.errors.apiKey;
     if (firstError) {
       body.append(this.notice('error', this.tr(firstError), ''));
     }
@@ -900,46 +899,21 @@ export class ProviderPanel {
     const protocolField = mountSelect(grid, {
       label: this.tr('protocol'),
       value: current.protocol,
-      options: [
-        ...PROTOCOLS.map((item) => ({ id: item.id, label: this.protocolLabel(item.id), hint: packageLabel(item.package) })),
-        { id: 'custom', label: this.tr('protocolCustom') },
-      ],
+      options: PROTOCOLS.map((item) => ({
+        id: item.id,
+        label: this.protocolLabel(item.id),
+        hint: packageLabel(item.package),
+      })),
+      // An existing provider may carry a package outside the three known
+      // protocols. Keep it on disk and show it as the current value; the
+      // dropdown only offers the protocols the form can write.
+      placeholder: this.tr('protocolCustom'),
       onChange: (id) => {
-        // Carry the package the provider already uses when switching to a
-        // custom one, so the field starts from what is on disk.
-        if (id === 'custom' && !current.customPackage.trim()) {
-          const existing = this.entryOf(this.editingID);
-          current.customPackage = existing
-            ? packageFrom(existing.block)
-            : packageOfProtocol(current.protocol);
-        }
-        if (id !== 'custom' && current.protocol === 'custom' && this.editingID === null) {
-          current.customPackage = '';
-        }
         current.protocol = id as ProtocolId;
-        // A protocol change can reveal or hide the package field.
         this.paint();
       },
     });
     this.mounted.push(protocolField);
-
-    if (current.protocol === 'custom') {
-      const packageField = mountTextField(grid, {
-        label: this.tr('customPackage'),
-        value: current.customPackage,
-        mono: true,
-        placeholder: 'aisdk:@ai-sdk/openai-compatible',
-        error: this.errors.customPackage ? this.tr(this.errors.customPackage) : undefined,
-        onChange: (value) => {
-          current.customPackage = value;
-          if (this.errors.customPackage) {
-            this.errors.customPackage = undefined;
-            packageField.update({ value: current.customPackage, error: undefined });
-          }
-        },
-      });
-      this.mounted.push(packageField);
-    }
 
     const urlField = mountTextField(grid, {
       label: this.tr('baseURL'),
@@ -1224,13 +1198,6 @@ export class ProviderPanel {
     state.textContent = this.isDirty() ? this.tr('unsaved') : this.tr('savedState');
     foot.append(state, el('div', 'spacer'));
 
-    this.mounted.push(mountButton(foot, {
-      label: this.tr('refresh'),
-      variant: 'ghost',
-      size: 'sm',
-      disabled: this.busy,
-      onClick: () => this.askReload(),
-    }));
     this.mounted.push(mountButton(foot, {
       label: this.busy ? this.tr('saving') : this.tr('save'),
       size: 'sm',

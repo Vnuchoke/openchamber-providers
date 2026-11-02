@@ -53,7 +53,7 @@ export type ProviderDraft = {
   /** Display name; on a new provider it also suggests the ID. */
   name: string;
   protocol: ProtocolId;
-  /** Only used when `protocol` is `custom`. */
+  /** Only used when `protocol` is `custom`; read from an existing provider. */
   customPackage: string;
   baseURL: string;
   apiKey: string;

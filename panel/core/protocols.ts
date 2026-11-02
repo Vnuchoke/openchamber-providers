@@ -4,8 +4,8 @@
  * OpenCode V2 stores that as `package`, either a native
  * `@opencode/ai/providers/...` entrypoint or an AI SDK package prefixed with
  * `aisdk:`. The panel offers the three protocols a custom endpoint usually
- * speaks and keeps anything else as a custom package rather than silently
- * swapping it for a default.
+ * speaks. An existing provider with any other package keeps that package and
+ * is shown as a custom package, but the form no longer offers creating one.
  */
 
 export type ProtocolId = 'openai-chat' | 'openai-responses' | 'anthropic-messages' | 'custom';
@@ -45,7 +45,7 @@ export const packageFrom = (provider: Record<string, unknown>): string => {
 
 /**
  * Protocol for a package string. Unknown packages are `custom`, so the form
- * shows the package itself instead of pretending it is OpenAI Chat.
+ * keeps the package on disk instead of pretending it is OpenAI Chat.
  */
 export const protocolOfPackage = (pkg: string): ProtocolId => {
   const name = pkg.trim().toLowerCase().replace(/^aisdk:/, '');

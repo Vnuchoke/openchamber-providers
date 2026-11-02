@@ -22,7 +22,7 @@ unrelated settings are preserved byte for byte.
 - Models with decimal context and output limits, upstream model ID, image input and tool calling
 - **Fetch** a provider's model list and pick the model ID from a dropdown, instead of typing it
 - Reasoning levels as clickable cards, written as OpenCode's own `capabilities.reasoning`;
-  a custom package also gets the matching `variants`, since OpenCode derives none for it
+  an existing custom package also gets the matching `variants`, since OpenCode derives none for it
 - Reads both `opencode.json` and `opencode.jsonc`; edits write back to the file they came from
 - Saving merges with the block on disk, so headers, request bodies, pricing, disabled
   models and hand-written variants survive
@@ -65,8 +65,8 @@ and paste the absolute path of the cloned folder into the same field.
 6. Choose **Save**. The block is written and the provider appears under
    **Settings → Providers**.
 
-Editing and deleting work the same way. **Reload** in the provider list header (or the
-editor footer) re-reads both config files when something changed outside the panel.
+Editing and deleting work the same way. **Reload** in the provider list header re-reads both
+config files when something changed outside the panel.
 
 The API key is written to `settings.apiKey` as plain text. To keep the secret out of the
 file, enter `{env:VAR_NAME}` (or `{file:path/to/secret}`) instead.
@@ -178,9 +178,9 @@ panel reads the old shape, so existing providers open with their levels and limi
 ## Troubleshooting reasoning levels
 
 OpenCode 2 only turns `capabilities.reasoning` into variants for the runtime packages it
-knows. With a **Custom package** it derives nothing, so the panel writes the variants for
-the selected levels itself; they are plain `reasoningEffort` overlays, which is what an
-OpenAI-compatible endpoint expects.
+knows. With a package outside those three it derives nothing, so the panel writes the
+variants for the selected levels itself; they are plain `reasoningEffort` overlays, which is
+what an OpenAI-compatible endpoint expects.
 
 If a model shows no levels in the picker after saving, check these in order:
 

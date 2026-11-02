@@ -526,7 +526,6 @@ test('validation catches the mistakes the form can make', () => {
   assert.equal(validateDraft(draft({ models: [] }), base).models, 'errorModels');
   assert.equal(validateDraft(draft({ models: [{ ...emptyModel(), id: 'a' }, { ...emptyModel(), id: 'a' }] }), base).models, 'errorModelsDuplicate');
   assert.equal(validateDraft(draft({ models: [{ ...emptyModel(), context: '1.5' }] }), base).models, 'errorLimits');
-  assert.equal(validateDraft(draft({ protocol: 'custom', customPackage: 'not a package' }), base).customPackage, 'errorPackage');
 });
 
 test('env and file key references are accepted', () => {
