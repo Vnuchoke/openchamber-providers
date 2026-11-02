@@ -14,16 +14,11 @@
   box-sizing: border-box;
 }
 
-/*
- * Stay transparent until the host paints its theme tokens: the frame already
- * sits on the host's surface colour, and an opaque fallback would flash white
- * in a dark theme before `host.onReady` arrives.
- */
 html,
 body {
   margin: 0;
   height: 100%;
-  background: var(--oc-bg, transparent);
+  background: var(--oc-bg, Canvas);
   color: var(--oc-fg, inherit);
   font-family: var(--oc-font, system-ui, sans-serif);
   font-size: 0.875rem;
@@ -291,7 +286,7 @@ html[data-oc-surface='page'] .panes {
   flex-direction: column;
   min-height: 0;
   min-width: 0;
-  background: var(--oc-bg, transparent);
+  background: var(--oc-bg);
 }
 
 .detail-head {
