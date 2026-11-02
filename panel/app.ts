@@ -179,12 +179,12 @@ export class ProviderPanel {
           const next = this.entryOf(this.selectedID);
           if (next && !next.overlay) this.openDraft(next);
         }
-      } else if (!this.draft) {
+      } else {
+        // A reload from the list must stay on the list: only an edit that was
+        // already open is kept, never opened on the user's behalf.
         this.selectedID = this.snapshot.providers.some((entry) => entry.id === this.selectedID)
           ? this.selectedID
           : this.defaultSelection();
-        const entry = this.entryOf(this.selectedID);
-        if (entry && !entry.overlay) this.openDraft(entry);
       }
     } catch (error) {
       this.fatal = errorText(error);
